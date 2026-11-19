@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Café Sales Dashboard</title>
+<meta name="description" content="Sales dashboard for a fictional Sydney café, built from a cleaned year of synthetic POS data.">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --s1: #2a78d6; --s1-wash: rgba(42,120,214,0.10); --band: rgba(11,11,11,0.05);
+    --q1: #cde2fb; --q2: #9ec5f4; --q3: #6da7ec; --q4: #3987e5; --q5: #256abf; --q6: #184f95; --q7: #0d366b;
+    --closed: #f0efec; --chip: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+      --s1: #3987e5; --s1-wash: rgba(57,135,229,0.12); --band: rgba(255,255,255,0.06);
+      --q1: #104281; --q2: #184f95; --q3: #1c5cab; --q4: #256abf; --q5: #3987e5; --q6: #6da7ec; --q7: #b7d3f6;
+      --closed: #262624; --chip: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s1-wash: rgba(57,135,229,0.12); --band: rgba(255,255,255,0.06);
+    --q1: #104281; --q2: #184f95; --q3: #1c5cab; --q4: #256abf; --q5: #3987e5; --q6: #6da7ec; --q7: #b7d3f6;
+    --closed: #262624; --chip: #262624;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 26px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); margin: 0; font-size: 14px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .filters span { color: var(--ink-2); font-size: 13px; margin-right: 4px; }
+  .filters button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+                    border: 1px solid var(--ring); background: var(--chip); color: var(--ink); }
+  .filters button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .filters button:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+  .kpi .label { color: var(--ink-2); font-size: 13px; }
+  .kpi .value { font-size: 28px; font-weight: 600; margin-top: 2px; }
+  .kpi.hero .value { font-size: 48px; line-height: 1.05; }
+  .kpi .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .kpis .hero { grid-row: span 1; }
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .grid.even { grid-template-columns: 1fr 1fr; }
+  h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card .desc { color: var(--ink-2); font-size: 13px; margin: 2px 0 10px; }
+  .chart { position: relative; width: 100%; }
+  svg { display: block; overflow: visible; }
+  svg text { font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); }
+  svg text.ink { fill: var(--ink); }
+  svg text.ink2 { fill: var(--ink-2); }
+  details { margin-top: 10px; font-size: 13px; }
+  summary { cursor: pointer; color: var(--ink-2); }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+  .tablewrap { overflow-x: auto; max-height: 320px; }
+  .findings { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .finding h3 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .finding p { margin: 0; color: var(--ink-2); font-size: 14px; }
+  .finding .n { display: inline-block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .section-title { font-size: 17px; font-weight: 600; margin: 28px 0 10px; }
+  .legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); margin-top: 8px; flex-wrap: wrap; }
+  .ramp { display: flex; }
+  .ramp i { width: 22px; height: 10px; display: block; }
+  .ramp i:first-child { border-radius: 3px 0 0 3px; } .ramp i:last-child { border-radius: 0 3px 3px 0; }
+  .swatch { width: 14px; height: 10px; border-radius: 3px; background: var(--closed); border: 1px solid var(--ring); }
+  #tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink);
+         border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 13px;
+         box-shadow: 0 4px 16px rgba(0,0,0,0.12); opacity: 0; transition: opacity .08s; max-width: 260px; }
+  #tip b { font-weight: 600; }
+  #tip .row { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+  #tip .row span:last-child { color: var(--ink); font-variant-numeric: tabular-nums; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 13px; }
+  footer a { color: var(--ink-2); }
+  @media (max-width: 900px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpis .hero { grid-column: span 2; }
+    .grid, .grid.even, .findings { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .wrap { padding: 20px 16px 40px; }
+    .kpi.hero .value { font-size: 40px; }
+    .kpi .value { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Tallow &amp; Bean Café: sales dashboard</h1>
+      <p class="sub">Fictional café in Strathfield, NSW. A year of synthetic point-of-sale data, cleaned and analysed.</p>
+    </div>
+    <div class="filters" role="group" aria-label="Period">
+      <span>Period</span>
+      <button data-p="12" aria-pressed="true">Last 12 months</button>
+      <button data-p="6" aria-pressed="false">Last 6 months</button>
+      <button data-p="3" aria-pressed="false">Last 3 months</button>
+      <button data-p="summer" aria-pressed="false">Summer</button>
+      <button data-p="winter" aria-pressed="false">Winter</button>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Key figures">
+    <div class="card kpi hero"><div class="label">Revenue</div><div class="value" id="k-rev"></div><div class="note" id="k-range"></div></div>
+    <div class="card kpi"><div class="label">Gross profit</div><div class="value" id="k-gp"></div><div class="note" id="k-gm"></div></div>
+    <div class="card kpi"><div class="label">Orders</div><div class="value" id="k-ord"></div><div class="note" id="k-opd"></div></div>
+    <div class="card kpi"><div class="label">Average order value</div><div class="value" id="k-aov"></div><div class="note">Revenue per order</div></div>
+    <div class="card kpi"><div class="label">Refunds</div><div class="value" id="k-ref"></div><div class="note" id="k-refp"></div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Monthly revenue</h2>
+      <p class="desc">AUD, net of refunds. The shaded band is the selected period.</p>
+      <div class="chart" id="c-line"></div>
+      <details><summary>View table</summary><div class="tablewrap" id="t-line"></div></details>
+    </div>
+    <div class="card">
+      <h2>Revenue by category</h2>
+      <p class="desc">AUD, selected period</p>
+      <div class="chart" id="c-cat"></div>
+      <details><summary>View table</summary><div class="tablewrap" id="t-cat"></div></details>
+    </div>
+  </section>
+
+  <section class="grid even">
+    <div class="card">
+      <h2>When customers come in</h2>
+      <p class="desc">Average orders per hour, by day of the week</p>
+      <div class="chart" id="c-heat"></div>
+      <div class="legend" id="l-heat"></div>
+      <details><summary>View table</summary><div class="tablewrap" id="t-heat"></div></details>
+    </div>
+    <div class="card">
+      <h2>Menu check: popularity vs margin</h2>
+      <p class="desc">Each dot is a menu item. Lines mark the menu averages.</p>
+      <div class="chart" id="c-menu"></div>
+      <details><summary>View table</summary><div class="tablewrap" id="t-menu"></div></details>
+    </div>
+  </section>
+
+  <h2 class="section-title">What the owner should do (full year)</h2>
+  <section class="findings" id="findings"></section>
+
+  <footer>
+    Built by Kushal Kunwar with Python (pandas) and hand-written SVG. All data is synthetic, and the café is made up.
+    The raw export had duplicate rows, mixed date formats, misspelt items and typo prices; see the
+    <a href="../reports/data_quality.md">data quality report</a>.
+  </footer>
+</div>
+<div id="tip" role="tooltip"></div>
+<script src="data.js"></script>
+<script>
+(() => {
+  const D = window.CAFE;
+  const M = D.months;
+  const PERIODS = {
+    "12": M, "6": M.slice(-6), "3": M.slice(-3),
+    summer: ["2025-11", "2025-12", "2026-01", "2026-02"], winter: ["2026-06", "2026-07", "2026-08"],
+  };
+  const NS = "http://www.w3.org/2000/svg";
+  const aud0 = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 });
+  const aud2 = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2 });
+  const int = new Intl.NumberFormat("en-AU");
+  const pct = v => (v * 100).toFixed(1) + "%";
+  const compact = v => v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : v >= 1e4 ? "$" + Math.round(v / 1e3) + "K" : aud0.format(v);
+  const mLabel = m => new Date(m + "-01T00:00").toLocaleDateString("en-AU", { month: "short" });
+  const mLong = m => new Date(m + "-01T00:00").toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+  const HOURL = h => (h === 12 ? "12pm" : h > 12 ? (h - 12) + "pm" : h + "am");
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function el(tag, attrs = {}, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function svg(host, w, h) {
+    host.innerHTML = "";
+    return el("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, host);
+  }
+  function niceMax(v, ticks = 4) {
+    const raw = v / ticks, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw);
+    return { max: step * ticks, step };
+  }
+  // Rounded data-end, square baseline
+  function barPath(x, y, w, h, dir) {
+    const r = Math.min(4, dir === "h" ? h / 2 : w / 2, dir === "h" ? w : h);
+    if (dir === "h") return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`;
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+  function table(host, head, rows) {
+    host.innerHTML = "<table><thead><tr>" + head.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
+      rows.map(r => "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>").join("") + "</tbody></table>";
+  }
+
+  const tip = document.getElementById("tip");
+  function showTip(evt, title, rows) {
+    tip.innerHTML = `<b>${title}</b>` + rows.map(([k, v]) => `<div class="row"><span>${k}</span><span>${v}</span></div>`).join("");
+    tip.style.opacity = 1;
+    const pad = 14, tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = evt.clientX + pad, y = evt.clientY + pad;
+    if (x + tw > innerWidth - 8) x = evt.clientX - tw - pad;
+    if (y + th > innerHeight - 8) y = evt.clientY - th - pad;
+    tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+  }
+  const hideTip = () => { tip.style.opacity = 0; };
+
+  // ---------- aggregation over the selected months ----------
+  function summarise(ms) {
+    const k = { revenue: 0, gp: 0, orders: 0, days: 0, refunds: 0 };
+    const cats = {}, items = {};
+    const heatO = D.days.map(() => D.hours.map(() => 0)), heatN = D.days.map(() => 0);
+    for (const m of ms) {
+      for (const f in k) k[f] += D.kpi[m][f];
+      for (const c in D.cats[m]) cats[c] = (cats[c] || 0) + D.cats[m][c];
+      for (const i in D.items[m]) {
+        const [u, r, g] = D.items[m][i];
+        const t = items[i] || (items[i] = { units: 0, revenue: 0, gp: 0 });
+        t.units += u; t.revenue += r; t.gp += g;
+      }
+      D.heat[m].orders.forEach((row, d) => row.forEach((v, h) => { heatO[d][h] += v; }));
+      D.heat[m].ndays.forEach((n, d) => { heatN[d] += n; });
+    }
+    return { k, cats, items, heatO, heatN };
+  }
+
+  // ---------- KPIs ----------
+  function renderKpis(ms, S) {
+    const k = S.k;
+    document.getElementById("k-rev").textContent = compact(k.revenue);
+    document.getElementById("k-range").textContent = ms.length === 1 ? mLong(ms[0]) : `${mLong(ms[0])} to ${mLong(ms[ms.length - 1])}`;
+    document.getElementById("k-gp").textContent = compact(k.gp);
+    document.getElementById("k-gm").textContent = pct(k.gp / k.revenue) + " gross margin";
+    document.getElementById("k-ord").textContent = int.format(k.orders);
+    document.getElementById("k-opd").textContent = Math.round(k.orders / k.days) + " a day on average";
+    document.getElementById("k-aov").textContent = aud2.format(k.revenue / k.orders);
+    document.getElementById("k-ref").textContent = aud0.format(k.refunds);
+    document.getElementById("k-refp").textContent = pct(k.refunds / (k.revenue + k.refunds)) + " of sales";
+  }
+
+  // ---------- Monthly revenue line ----------
+  function renderLine(ms) {
+    const host = document.getElementById("c-line");
+    const W = host.clientWidth, H = 260, m = { t: 16, r: 64, b: 28, l: 52 };
+    const s = svg(host, W, H), iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const vals = M.map(x => D.kpi[x].revenue);
+    const { max, step } = niceMax(Math.max(...vals));
+    const X = i => m.l + (i / (M.length - 1)) * iw, Y = v => m.t + ih - (v / max) * ih;
+    for (let v = 0; v <= max + 1e-6; v += step) {
+      el("line", { x1: m.l, x2: m.l + iw, y1: Y(v), y2: Y(v), stroke: v === 0 ? css("--axis") : css("--grid"), "stroke-width": 1 }, s);
+      el("text", { x: m.l - 8, y: Y(v) + 4, "text-anchor": "end" }, s).textContent = v === 0 ? "0" : (v / 1000) + "K";
+    }
+    // selected period band
+    const idx = ms.map(x => M.indexOf(x)), i0 = Math.min(...idx), i1 = Math.max(...idx);
+    if (ms.length < M.length) {
+      const half = iw / (M.length - 1) / 2;
+      el("rect", { x: Math.max(m.l, X(i0) - half), y: m.t, width: Math.min(m.l + iw, X(i1) + half) - Math.max(m.l, X(i0) - half), height: ih, fill: css("--band"), rx: 4 }, s);
+    }
+    M.forEach((x, i) => {
+      if (W < 520 && i % 2) return;
+      el("text", { x: X(i), y: H - 8, "text-anchor": "middle" }, s).textContent = mLabel(x);
+    });
+    const pts = vals.map((v, i) => [X(i), Y(v)]);
+    el("path", { d: `M${pts[0][0]},${Y(0)}L` + pts.map(p => p.join(",")).join("L") + `L${pts.at(-1)[0]},${Y(0)}Z`, fill: css("--s1-wash") }, s);
+    el("path", { d: "M" + pts.map(p => p.join(",")).join("L"), fill: "none", stroke: css("--s1"), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, s);
+    // end label + end dot
+    const last = pts.at(-1);
+    el("circle", { cx: last[0], cy: last[1], r: 4, fill: css("--s1"), stroke: css("--surface"), "stroke-width": 2 }, s);
+    el("text", { x: last[0] + 10, y: last[1] + 4, class: "ink" }, s).textContent = compact(vals.at(-1));
+    // hover crosshair
+    const cross = el("line", { y1: m.t, y2: m.t + ih, stroke: css("--axis"), "stroke-width": 1, opacity: 0 }, s);
+    const dot = el("circle", { r: 5, fill: css("--s1"), stroke: css("--surface"), "stroke-width": 2, opacity: 0 }, s);
+    const hit = el("rect", { x: m.l - 10, y: m.t, width: iw + 20, height: ih, fill: "transparent" }, s);
+    hit.addEventListener("mousemove", e => {
+      const r = s.getBoundingClientRect(), px = e.clientX - r.left;
+      const i = Math.max(0, Math.min(M.length - 1, Math.round(((px - m.l) / iw) * (M.length - 1))));
+      const k = D.kpi[M[i]];
+      cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+      dot.setAttribute("cx", X(i)); dot.setAttribute("cy", Y(k.revenue)); dot.setAttribute("opacity", 1);
+      showTip(e, mLong(M[i]), [["Revenue", aud0.format(k.revenue)], ["Gross profit", aud0.format(k.gp)],
+        ["Orders", int.format(k.orders)], ["Avg order", aud2.format(k.revenue / k.orders)]]);
+    });
+    hit.addEventListener("mouseleave", () => { cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); hideTip(); });
+    table(document.getElementById("t-line"), ["Month", "Revenue", "Gross profit", "Orders"],
+      M.map(x => [mLong(x), aud0.format(D.kpi[x].revenue), aud0.format(D.kpi[x].gp), int.format(D.kpi[x].orders)]));
+  }
+
+  // ---------- Category bars ----------
+  function renderCats(S) {
+    const host = document.getElementById("c-cat");
+    const rows = Object.entries(S.cats).sort((a, b) => b[1] - a[1]);
+    const total = rows.reduce((a, r) => a + r[1], 0);
+    const W = host.clientWidth, band = 38, m = { t: 4, r: 64, b: 4, l: 92 };
+    const H = m.t + m.b + band * rows.length, s = svg(host, W, H), iw = W - m.l - m.r;
+    const max = rows[0][1];
+    el("line", { x1: m.l, x2: m.l, y1: m.t, y2: H - m.b, stroke: css("--axis"), "stroke-width": 1 }, s);
+    rows.forEach(([c, v], i) => {
+      const y = m.t + i * band + (band - 20) / 2, w = Math.max(2, (v / max) * iw);
+      el("text", { x: m.l - 10, y: y + 14, "text-anchor": "end", class: "ink2" }, s).textContent = c;
+      const p = el("path", { d: barPath(m.l, y, w, 20, "h"), fill: css("--s1") }, s);
+      el("text", { x: m.l + w + 8, y: y + 14, class: "ink" }, s).textContent = compact(v);
+      const hit = el("rect", { x: 0, y: m.t + i * band, width: W, height: band, fill: "transparent" }, s);
+      hit.addEventListener("mousemove", e => { p.setAttribute("opacity", .85); showTip(e, c, [["Revenue", aud0.format(v)], ["Share", pct(v / total)]]); });
+      hit.addEventListener("mouseleave", () => { p.setAttribute("opacity", 1); hideTip(); });
+    });
+    table(document.getElementById("t-cat"), ["Category", "Revenue", "Share"], rows.map(([c, v]) => [c, aud0.format(v), pct(v / total)]));
+  }
+
+  // ---------- Heatmap ----------
+  function renderHeat(S) {
+    const host = document.getElementById("c-heat");
+    const short = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const W = host.clientWidth, m = { t: 4, r: 4, b: 24, l: 40 };
+    const cw = (W - m.l - m.r) / D.hours.length, ch = Math.min(34, Math.max(24, cw * 0.62));
+    const H = m.t + m.b + ch * 7, s = svg(host, W, H);
+    const val = S.heatO.map((row, d) => row.map(v => (S.heatN[d] ? v / S.heatN[d] : 0)));
+    const open = (d, h) => !(d >= 5 && D.hours[h] === 6); // weekends open 7am
+    const all = val.flatMap((r, d) => r.filter((_, h) => open(d, h)));
+    const vmax = Math.max(...all);
+    const steps = ["--q1", "--q2", "--q3", "--q4", "--q5", "--q6", "--q7"].map(css);
+    const bucket = v => Math.min(6, Math.floor((v / vmax) * 7));
+    val.forEach((row, d) => {
+      el("text", { x: m.l - 8, y: m.t + d * ch + ch / 2 + 4, "text-anchor": "end", class: "ink2" }, s).textContent = short[d];
+      row.forEach((v, h) => {
+        const x = m.l + h * cw, y = m.t + d * ch;
+        const isOpen = open(d, h);
+        const r = el("rect", { x: x + 1, y: y + 1, width: cw - 2, height: ch - 2, rx: 4, fill: isOpen ? steps[bucket(v)] : css("--closed") }, s);
+        r.addEventListener("mousemove", e => showTip(e, `${D.days[d]}, ${HOURL(D.hours[h])}`,
+          isOpen ? [["Avg orders", v.toFixed(1)], ["Days counted", int.format(S.heatN[d])]] : [["Status", "Closed"]]));
+        r.addEventListener("mouseleave", hideTip);
+      });
+    });
+    D.hours.forEach((hr, h) => {
+      if (cw < 34 && h % 2) return;
+      el("text", { x: m.l + h * cw + cw / 2, y: H - 6, "text-anchor": "middle" }, s).textContent = HOURL(hr);
+    });
+    document.getElementById("l-heat").innerHTML = `<span>0</span><span class="ramp">${steps.map(c => `<i style="background:${c}"></i>`).join("")}</span><span>${vmax.toFixed(0)} orders/hour</span><span class="swatch"></span><span>Closed</span>`;
+    table(document.getElementById("t-heat"), ["Day", ...D.hours.map(HOURL)],
+      val.map((row, d) => [D.days[d], ...row.map((v, h) => (open(d, h) ? v.toFixed(1) : "closed"))]));
+  }
+
+  // ---------- Menu engineering scatter ----------
+  function renderMenu(S) {
+    const host = document.getElementById("c-menu");
+    const pts = Object.entries(S.items).map(([name, t]) => ({ name, units: t.units, margin: t.gp / t.revenue, rev: t.revenue, cat: D.menu[name].category, price: D.menu[name].price }));
+    const W = host.clientWidth, H = 300, m = { t: 22, r: 16, b: 40, l: 48 };
+    const s = svg(host, W, H), iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const xm = niceMax(Math.max(...pts.map(p => p.units)));
+    const y0 = 0.6, y1 = 0.9;
+    const X = v => m.l + (v / xm.max) * iw, Y = v => m.t + ih - ((v - y0) / (y1 - y0)) * ih;
+    for (let v = y0; v <= y1 + 1e-6; v += 0.1) {
+      el("line", { x1: m.l, x2: m.l + iw, y1: Y(v), y2: Y(v), stroke: css("--grid"), "stroke-width": 1 }, s);
+      el("text", { x: m.l - 8, y: Y(v) + 4, "text-anchor": "end" }, s).textContent = Math.round(v * 100) + "%";
+    }
+    for (let v = 0; v <= xm.max + 1e-6; v += xm.step) {
+      el("text", { x: X(v), y: m.t + ih + 18, "text-anchor": "middle" }, s).textContent = v >= 1000 ? (v / 1000) + "K" : v;
+    }
+    el("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, stroke: css("--axis"), "stroke-width": 1 }, s);
+    el("text", { x: m.l + iw, y: H - 4, "text-anchor": "end" }, s).textContent = "Units sold →";
+    el("text", { x: m.l - 40, y: 10 }, s).textContent = "Gross margin";
+    const ux = pts.reduce((a, p) => a + p.units, 0) / pts.length;
+    const my = pts.reduce((a, p) => a + p.margin, 0) / pts.length;
+    el("line", { x1: X(ux), x2: X(ux), y1: m.t, y2: m.t + ih, stroke: css("--axis"), "stroke-width": 1 }, s);
+    el("line", { x1: m.l, x2: m.l + iw, y1: Y(my), y2: Y(my), stroke: css("--axis"), "stroke-width": 1 }, s);
+    const q = [["Puzzles: push these", m.l + 6, m.t + 12, "start"], ["Stars: keep", m.l + iw - 4, m.t + 12, "end"],
+               ["Dogs: rethink", m.l + 6, m.t + ih - 8, "start"], ["Workhorses: reprice", m.l + iw - 4, m.t + ih - 8, "end"]];
+    q.forEach(([t, x, y, a]) => { el("text", { x, y, "text-anchor": a, class: "ink2" }, s).textContent = t; });
+    const label = new Set([...pts].sort((a, b) => b.units - a.units).slice(0, 2).map(p => p.name)
+      .concat([...pts].sort((a, b) => a.margin - b.margin).slice(0, 1).map(p => p.name)));
+    pts.forEach(p => {
+      const c = el("circle", { cx: X(p.units), cy: Y(p.margin), r: 5, fill: css("--s1"), stroke: css("--surface"), "stroke-width": 2 }, s);
+      if (label.has(p.name)) {
+        const right = X(p.units) < m.l + iw - 110;
+        el("text", { x: X(p.units) + (right ? 8 : -8), y: Y(p.margin) - 7, "text-anchor": right ? "start" : "end", class: "ink" }, s).textContent = p.name;
+      }
+      const hit = el("circle", { cx: X(p.units), cy: Y(p.margin), r: 11, fill: "transparent" }, s);
+      hit.addEventListener("mousemove", e => { c.setAttribute("r", 7); showTip(e, p.name, [["Category", p.cat], ["Units sold", int.format(p.units)], ["Gross margin", pct(p.margin)], ["Revenue", aud0.format(p.rev)], ["Price", aud2.format(p.price)]]); });
+      hit.addEventListener("mouseleave", () => { c.setAttribute("r", 5); hideTip(); });
+    });
+    const quad = p => (p.units >= ux ? (p.margin >= my ? "Star" : "Workhorse") : (p.margin >= my ? "Puzzle" : "Dog"));
+    table(document.getElementById("t-menu"), ["Item", "Category", "Units", "Margin", "Revenue", "Group"],
+      pts.sort((a, b) => b.units - a.units).map(p => [p.name, p.cat, int.format(p.units), pct(p.margin), aud0.format(p.rev), quad(p)]));
+  }
+
+  // ---------- findings ----------
+  document.getElementById("findings").innerHTML = D.findings.map((f, i) =>
+    `<article class="card finding"><span class="n">Finding ${i + 1}</span><h3>${f.title}</h3><p>${f.text}</p></article>`).join("");
+
+  // ---------- wiring ----------
+  let period = "12";
+  try { period = localStorage.getItem("cafe-period") || "12"; } catch (e) {}
+  if (!PERIODS[period]) period = "12";
+  function render() {
+    const ms = PERIODS[period], S = summarise(ms);
+    document.querySelectorAll(".filters button").forEach(b => b.setAttribute("aria-pressed", b.dataset.p === period));
+    renderKpis(ms, S); renderLine(ms); renderCats(S); renderHeat(S); renderMenu(S);
+  }
+  document.querySelectorAll(".filters button").forEach(b => b.addEventListener("click", () => {
+    period = b.dataset.p;
+    try { localStorage.setItem("cafe-period", period); } catch (e) {}
+    render();
+  }));
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 120); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+  render();
+})();
+</script>
+</body>
+</html>

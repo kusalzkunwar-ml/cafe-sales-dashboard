@@ -1,0 +1,23 @@
+item,category,menu_price,unit_cost
+Flat White,Coffee,5.0,1.1
+Cappuccino,Coffee,5.0,1.1
+Latte,Coffee,5.2,1.2
+Long Black,Coffee,4.5,0.8
+Iced Latte,Coffee,6.5,1.5
+Chai Latte,Tea & Other,5.5,1.3
+English Breakfast Tea,Tea & Other,4.5,0.6
+Hot Chocolate,Tea & Other,5.5,1.4
+Fresh Orange Juice,Cold Drinks,7.5,2.6
+Iced Coffee,Cold Drinks,7.5,2.0
+Smoothie,Cold Drinks,9.0,3.2
+Banana Bread,Bakery,6.0,1.5
+Croissant,Bakery,5.5,1.8
+Almond Croissant,Bakery,7.0,2.4
+Muffin,Bakery,5.0,1.4
+Avocado Toast,Brunch,18.5,5.8
+Big Breakfast,Brunch,24.0,8.9
+Eggs Benedict,Brunch,21.0,6.7
+Acai Bowl,Brunch,17.0,6.1
+Ham & Cheese Toastie,Lunch,12.0,3.6
+Chicken Wrap,Lunch,15.0,5.2
+Caesar Salad,Lunch,17.5,5.9
